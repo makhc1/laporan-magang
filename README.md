@@ -4,7 +4,7 @@ Platform web presentasi interaktif, jurnal kegiatan harian (*logbook*), dan port
 
 ---
 
-## 🏛️ Profil Instansi & Periode Pelaksanaan
+## Profil Instansi & Periode Pelaksanaan
 
 * **Instansi Mitra:** Direktorat Jenderal Kekuatan Pertahanan (Ditjen Kuathan), Kementerian Pertahanan RI
 * **Institusi Pendidikan:** SMK Mitra
@@ -13,7 +13,7 @@ Platform web presentasi interaktif, jurnal kegiatan harian (*logbook*), dan port
 
 ---
 
-## 👥 Struktur Tim & Pembagian Penugasan
+## Struktur Tim & Pembagian Penugasan
 
 Aplikasi ini mengintegrasikan capaian kerja dari 5 siswa magang dengan peran dan unit kerja kedinasan yang berbeda:
 
@@ -27,7 +27,7 @@ Aplikasi ini mengintegrasikan capaian kerja dari 5 siswa magang dengan peran dan
 
 ---
 
-## ✨ Fitur-Fitur Utama Platform
+## Fitur-Fitur Utama Platform
 
 ### 1. Panggung Interaktif Karakter Avatar (Vector 2D SVG)
 * Menampilkan visualisasi karakter kustom untuk setiap siswa berbasis vektor murni tanpa ketergantungan aset bitmap berat.
@@ -56,7 +56,7 @@ Dirancang khusus untuk mendukung kelancaran pemaparan saat berhadapan dengan Dew
 
 ---
 
-## 🛠️ Arsitektur & Teknologi
+## Arsitektur & Teknologi
 
 * **Frontend Framework:** React 19 (Component-driven Architecture & `React.memo` performance optimization)
 * **Build Tool & Bundler:** Vite 8 dengan konfigurasi *vendor code-splitting* (App core chunk < 25 kB gzipped)
