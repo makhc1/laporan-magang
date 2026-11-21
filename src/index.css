@@ -1,0 +1,293 @@
+@import "tailwindcss";
+
+@theme {
+  --color-canvas: #090b10;
+  --color-panel: #18181b;
+  --color-sub: #09090b;
+  --color-brand: #facc15;
+  --color-brand-hi: #fde047;
+  --color-crimson: #dc2626;
+  --color-alert: #ef4444;
+  --color-ink: #e4e4e7;
+  --color-muted: #a1a1aa;
+  --color-line: rgba(255, 255, 255, 0.1);
+
+  --font-display: "Barlow Condensed", "Arial Narrow", Impact, sans-serif;
+  --font-body: "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    background: var(--color-canvas);
+    color-scheme: dark;
+  }
+
+  body {
+    @apply overflow-x-hidden bg-canvas font-body text-base text-ink antialiased;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+
+  button {
+    cursor: pointer;
+    background: none;
+    border: 0;
+  }
+
+  :focus-visible {
+    outline: 3px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+
+  section {
+    scroll-margin-top: 4rem;
+  }
+
+  ::selection {
+    background: var(--color-brand);
+    color: #000;
+  }
+}
+
+@layer components {
+  .disp {
+    @apply font-display font-black italic uppercase leading-[0.95] tracking-[-0.005em];
+  }
+
+  .wide {
+    @apply font-display font-black italic uppercase tracking-[0.07em];
+  }
+
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2.5 font-display text-[15px] font-black italic uppercase leading-none tracking-[0.07em] transition-[background-color,color,transform] duration-150 active:translate-y-px;
+    clip-path: polygon(0 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%);
+  }
+
+  .btn-y {
+    @apply bg-brand text-black hover:bg-brand-hi;
+  }
+
+  .btn-r {
+    @apply bg-crimson text-white hover:bg-alert;
+  }
+
+  .btn-g {
+    @apply bg-zinc-800 text-white hover:bg-zinc-700;
+  }
+
+  .btn-lg {
+    @apply px-6 py-[18px] text-xl;
+  }
+
+  .chip {
+    @apply border border-line bg-panel px-3.5 py-2 text-center font-display text-[15px] font-black italic uppercase tracking-[0.06em] text-zinc-300 transition-colors hover:border-brand;
+  }
+
+  .chip-on {
+    @apply border-brand bg-brand text-black;
+  }
+
+  .tag {
+    @apply border border-line bg-sub px-1.5 py-0.5 font-mono text-[11px] text-zinc-300;
+  }
+
+  .tag-m {
+    @apply border-alert/60 text-red-300;
+  }
+
+  .input {
+    @apply w-full border border-line bg-sub px-3 py-[11px] font-body text-[15px] tracking-normal text-ink normal-case focus:border-brand focus:outline-none;
+  }
+
+  .field {
+    @apply flex flex-col gap-1.5 font-mono text-xs uppercase tracking-[0.04em] text-muted;
+  }
+
+  .panel {
+    @apply mb-5 border border-line bg-panel p-5;
+  }
+
+  .mini {
+    @apply border border-line bg-zinc-800 px-3 py-[7px] font-mono text-xs transition-colors hover:border-brand;
+  }
+
+  .mini-danger {
+    @apply text-red-300;
+  }
+
+  .mini-armed {
+    @apply border-crimson bg-crimson text-white;
+  }
+
+  .arr {
+    @apply grid h-11 w-11 place-items-center bg-zinc-800 font-display text-[26px] font-black italic text-brand transition-colors hover:bg-brand hover:text-black max-[700px]:w-full;
+  }
+
+  .bd {
+    @apply border border-line px-1.5 py-0.5;
+  }
+
+  .sub {
+    @apply mb-3.5 flex items-center gap-2.5 text-[28px] text-white;
+  }
+
+  .sub::before {
+    content: "";
+    display: block;
+    width: 8px;
+    height: 26px;
+    background: var(--color-crimson);
+    transform: skewX(-14deg);
+  }
+
+  .dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 9999px;
+    background: var(--color-alert);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7);
+    animation: pulse 1.6s infinite;
+  }
+}
+
+@keyframes pulse {
+  70% {
+    box-shadow: 0 0 0 9px rgba(239, 68, 68, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0);
+  }
+}
+
+/* ---------- hero ---------- */
+.hero {
+  background:
+    radial-gradient(900px 500px at 85% 10%, rgba(220, 38, 38, 0.22), transparent 60%),
+    var(--color-canvas);
+}
+
+.hero-lines {
+  background-image: repeating-linear-gradient(
+    118deg,
+    rgba(255, 255, 255, 0.025) 0 2px,
+    transparent 2px 70px
+  );
+}
+
+/* ---------- stage ---------- */
+.stage {
+  background: linear-gradient(180deg, #991b1b 0%, #dc2626 52%, #450a0a 86%, #09090b 100%);
+}
+
+.stripes {
+  background-image: repeating-linear-gradient(
+    118deg,
+    rgba(0, 0, 0, 0.28) 0px,
+    rgba(0, 0, 0, 0.28) 110px,
+    transparent 110px,
+    transparent 230px
+  );
+  background-size: 230px 230px;
+  animation: stripe-slide 12s linear infinite;
+}
+
+@keyframes stripe-slide {
+  to {
+    background-position: 230px 0;
+  }
+}
+
+.spot {
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--aura) 55%, #fff) 0%,
+    color-mix(in srgb, var(--aura) 30%, transparent) 45%,
+    transparent 90%
+  );
+  clip-path: polygon(38% 0, 62% 0, 100% 100%, 0 100%);
+  mix-blend-mode: screen;
+}
+
+.floor {
+  background: radial-gradient(
+    ellipse at center,
+    color-mix(in srgb, var(--aura) 80%, #fff) 0%,
+    color-mix(in srgb, var(--aura) 40%, transparent) 35%,
+    transparent 70%
+  );
+}
+
+.badge {
+  clip-path: polygon(0 0, 100% 0, 100% 70%, 56% 70%, 50% 100%, 44% 70%, 0 70%);
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    transform: scaleY(1);
+  }
+  50% {
+    transform: scaleY(1.015);
+  }
+}
+
+.breathe {
+  transform-origin: 50% 100%;
+  animation: breathe 1.8s ease-in-out infinite;
+}
+
+/* ---------- logbook ---------- */
+.tl {
+  position: relative;
+  padding-left: 26px;
+}
+
+.tl::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  background: linear-gradient(180deg, var(--color-brand), var(--color-alert));
+}
+
+.jr {
+  position: relative;
+  margin-bottom: 12px;
+  background: rgba(24, 24, 27, 0.9);
+  border: 1px solid var(--color-line);
+}
+
+.jr::before {
+  content: "";
+  position: absolute;
+  left: -26px;
+  top: 20px;
+  width: 13px;
+  height: 13px;
+  background: var(--color-canvas);
+  border: 3px solid var(--color-brand);
+  transform: rotate(45deg) translate(1px, 1px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}
