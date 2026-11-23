@@ -1,6 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BUILD, monthOf } from '../data/seed'
-import { byDate, fmtDate, pad, STATUS_COLORS } from '../lib/utils'
+import {
+  defaultJournalDate,
+  missingPklDates,
+  nextEmptyPklDate,
+  pklDayNumber,
+  PKL_RANGE_LABEL,
+  PKL_TOTAL_DAYS,
+} from '../lib/pkl'
+import { autoTitle, byDate, fmtDate, fmtShort, pad, STATUS_COLORS } from '../lib/utils'
 import Tri from './Tri'
 import Mockup from './Mockup'
 import Photo from './Photo'
@@ -9,7 +17,7 @@ const HAIR = ['buzz', 'spike', 'side', 'curly', 'cap']
 const SKIN = ['#d9a07a', '#c68b64', '#e3b48f', '#b9805b', '#e0ac86']
 
 const JOURNAL_DEFAULTS = {
-  date: '2026-08-03',
+  date: '2026-10-01',
   category: 'Pengembangan',
   title: '',
   desc: '',
@@ -25,34 +33,158 @@ const PROJECT_DEFAULTS = {
   tags: '',
 }
 
-function JournalForm({ editing, onSubmit, onCancel }) {
-  const [form, setForm] = useState(() =>
-    editing
-      ? {
-          date: editing.date,
-          category: editing.category,
-          title: editing.title,
-          desc: editing.desc,
-          photo: editing.photo || 'none',
-          status: editing.status,
-        }
-      : JOURNAL_DEFAULTS,
-  )
+const CATEGORIES = [
+  'Orientasi',
+  'Analisis',
+  'Perancangan',
+  'Pengembangan',
+  'Pengujian',
+  'Deployment',
+  'Dokumentasi',
+  'Survei',
+  'Konfigurasi',
+]
 
-  useEffect(() => {
+const blankJournal = (date, category) => ({
+  date: date || JOURNAL_DEFAULTS.date,
+  category: category || 'Pengembangan',
+  title: '',
+  desc: '',
+  photo: 'none',
+  status: 'Selesai',
+})
+
+const readDraft = (key) => {
+  try {
+    const raw = key ? localStorage.getItem(key) : null
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function JournalForm({
+  editing,
+  onSubmit,
+  onCancel,
+  initialDate,
+  jumpToken,
+  filledDates = [],
+  lastJournal,
+  draftKey,
+}) {
+  const initialForm = () => {
     if (editing) {
-      setForm({
+      return {
         date: editing.date,
         category: editing.category,
         title: editing.title,
         desc: editing.desc,
         photo: editing.photo || 'none',
         status: editing.status,
-      })
+      }
     }
+
+    const base = blankJournal(initialDate, lastJournal?.category)
+    const draft = readDraft(draftKey)
+    return draft ? { ...base, ...draft } : base
+  }
+
+  const [form, setForm] = useState(initialForm)
+  const [showDetails, setShowDetails] = useState(Boolean(editing))
+  const [showCustomCat, setShowCustomCat] = useState(() => !CATEGORIES.includes(form.category))
+  const descRef = useRef(null)
+  const customCatRef = useRef(null)
+
+  useEffect(() => {
+    if (!editing) return
+    setForm({
+      date: editing.date,
+      category: editing.category,
+      title: editing.title,
+      desc: editing.desc,
+      photo: editing.photo || 'none',
+      status: editing.status,
+    })
+    setShowDetails(true)
+    setShowCustomCat(!CATEGORIES.includes(editing.category))
   }, [editing])
 
+  // Lompat ke tanggal tertentu dari panel progres.
+  useEffect(() => {
+    if (!jumpToken) return
+    setForm((current) => ({ ...current, date: initialDate }))
+  }, [jumpToken]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Draft autosave: entri yang belum disimpan tidak hilang saat refresh.
+  useEffect(() => {
+    if (editing || !draftKey) return
+    try {
+      if (!form.desc.trim() && !form.title.trim()) {
+        localStorage.removeItem(draftKey)
+        return
+      }
+      localStorage.setItem(draftKey, JSON.stringify(form))
+    } catch {
+      /* localStorage penuh / tidak tersedia */
+    }
+  }, [form, editing, draftKey])
+
   const set = (key) => (event) => setForm((f) => ({ ...f, [key]: event.target.value }))
+
+  const resetAfterSave = (mode) => {
+    try {
+      if (draftKey) localStorage.removeItem(draftKey)
+    } catch {
+      /* ignore */
+    }
+
+    const nextDate =
+      mode === 'next'
+        ? nextEmptyPklDate(form.date, [...filledDates, form.date])
+        : form.date
+
+    setForm(blankJournal(nextDate, form.category))
+    setShowDetails(false)
+    setShowCustomCat(!CATEGORIES.includes(form.category))
+  }
+
+  const submit = (mode) => (event) => {
+    event.preventDefault()
+    const desc = form.desc.trim()
+
+    if (!desc) {
+      descRef.current?.focus()
+      return
+    }
+
+    onSubmit(
+      {
+        ...form,
+        category: form.category.trim() || 'Pengembangan',
+        title: form.title.trim() || autoTitle(desc),
+        desc,
+      },
+      mode,
+    )
+
+    if (!editing) resetAfterSave(mode)
+  }
+
+  const copyLast = () => {
+    if (!lastJournal) return
+    setForm((current) => ({
+      ...current,
+      category: lastJournal.category || current.category,
+      title: lastJournal.title || '',
+      desc: lastJournal.desc || '',
+      photo: lastJournal.photo || 'none',
+      status: 'Selesai',
+    }))
+    setShowCustomCat(!CATEGORIES.includes(lastJournal.category || 'Pengembangan'))
+  }
+
+  const dayNumber = pklDayNumber(form.date)
 
   return (
     <form
@@ -60,10 +192,7 @@ function JournalForm({ editing, onSubmit, onCancel }) {
       className={`panel transition-all ${
         editing ? 'border-2 border-brand bg-[#1c1b12]' : 'border-t-4 border-t-brand'
       }`}
-      onSubmit={(event) => {
-        event.preventDefault()
-        onSubmit(form)
-      }}
+      onSubmit={submit('stay')}
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
         <div>
@@ -72,12 +201,12 @@ function JournalForm({ editing, onSubmit, onCancel }) {
               className={`h-2.5 w-2.5 ${editing ? 'bg-brand' : 'bg-crimson'}`}
               aria-hidden="true"
             />
-            {editing ? 'Ganti / Edit Isi Kegiatan' : 'Tambah Kegiatan Magang Baru'}
+            {editing ? 'Ganti / Edit Isi Kegiatan' : 'Catat Cepat Kegiatan Harian'}
           </h3>
           <p className="font-mono text-xs text-muted">
             {editing
               ? `Mengubah detail kegiatan: "${editing.title}"`
-              : 'Catat aktivitas, progress, atau pencapaian magang harian'}
+              : 'Cukup tanggal, kategori, dan satu kalimat kegiatan. Detail lain opsional.'}
           </p>
         </div>
         {editing ? (
@@ -91,73 +220,149 @@ function JournalForm({ editing, onSubmit, onCancel }) {
         <label className="field">
           Tanggal Kegiatan
           <input className="input" type="date" required value={form.date} onChange={set('date')} />
+          <span
+            className={`font-mono text-[11px] normal-case tracking-normal ${
+              dayNumber ? 'text-brand' : 'text-muted'
+            }`}
+          >
+            {dayNumber
+              ? `Hari kerja ke-${dayNumber} dari ${PKL_TOTAL_DAYS}`
+              : `Bukan hari kerja magang (Senin–Jumat, ${PKL_RANGE_LABEL})`}
+          </span>
         </label>
-        <label className="field">
+
+        <div className="field">
+          Aksi Cepat
+          <div className="flex min-h-[43px] flex-wrap items-center gap-2">
+            {!editing && lastJournal ? (
+              <button className="btn btn-g text-xs" type="button" onClick={copyLast}>
+                Salin kegiatan terakhir
+              </button>
+            ) : null}
+            <span className="font-mono text-[11px] normal-case tracking-normal text-muted">
+              {editing
+                ? 'Simpan perubahan setelah selesai mengedit.'
+                : 'Draft tersimpan otomatis di browser ini.'}
+            </span>
+          </div>
+        </div>
+
+        <div className="field min-[760px]:col-span-2">
           Kategori Kegiatan
-          <input
-            className="input"
-            list="cats"
-            required
-            placeholder="contoh: Pengembangan"
-            value={form.category}
-            onChange={set('category')}
-          />
-          <datalist id="cats">
-            <option>Orientasi</option>
-            <option>Analisis</option>
-            <option>Perancangan</option>
-            <option>Pengembangan</option>
-            <option>Pengujian</option>
-            <option>Deployment</option>
-            <option>Dokumentasi</option>
-            <option>Survei</option>
-            <option>Konfigurasi</option>
-          </datalist>
-        </label>
+          <div className="flex flex-wrap gap-1.5">
+            {CATEGORIES.map((category) => (
+              <button
+                key={category}
+                type="button"
+                className={`chip px-2.5 py-1 text-xs ${
+                  form.category === category ? 'chip-on' : ''
+                }`}
+                onClick={() => {
+                  setForm((current) => ({ ...current, category }))
+                  setShowCustomCat(false)
+                }}
+                aria-pressed={form.category === category}
+              >
+                {category}
+              </button>
+            ))}
+            <button
+              type="button"
+              className={`chip px-2.5 py-1 text-xs ${
+                showCustomCat || !CATEGORIES.includes(form.category) ? 'chip-on' : ''
+              }`}
+              onClick={() => {
+                setShowCustomCat(true)
+                window.setTimeout(() => customCatRef.current?.focus(), 0)
+              }}
+              aria-pressed={showCustomCat}
+            >
+              Lainnya
+            </button>
+          </div>
+          {showCustomCat ? (
+            <input
+              ref={customCatRef}
+              className="input mt-1.5"
+              placeholder="contoh: Instalasi, Desain, Presentasi"
+              value={CATEGORIES.includes(form.category) ? '' : form.category}
+              onChange={set('category')}
+            />
+          ) : null}
+        </div>
+
         <label className="field min-[760px]:col-span-2">
-          Judul Kegiatan Magang
-          <input
-            className="input"
-            required
-            placeholder="contoh: Membangun backend autentikasi dan validasi formulir"
-            value={form.title}
-            onChange={set('title')}
-          />
-        </label>
-        <label className="field min-[760px]:col-span-2">
-          Deskripsi Isi Kegiatan
+          Hari Ini Ngapain?
           <textarea
-            className="input min-h-[110px] resize-y"
+            ref={descRef}
+            className="input min-h-[96px] resize-y"
             required
-            placeholder="Jelaskan apa yang dikerjakan, kendala yang dihadapi, dan hasil pekerjaan..."
+            placeholder="contoh: Bikin form login pakai React Hook Form, validasi email/password, testing 5 kasus."
             value={form.desc}
             onChange={set('desc')}
+            onKeyDown={(event) => {
+              if ((event.metaKey || event.ctrlKey) && event.key === 'Enter') {
+                event.preventDefault()
+                event.currentTarget.form?.requestSubmit()
+              }
+            }}
           />
-        </label>
-        <label className="field">
-          Dokumentasi Visual / Foto
-          <select className="input" value={form.photo} onChange={set('photo')}>
-            <option value="none">Tanpa foto</option>
-            <option value="coding">Sesi pengembangan / coding</option>
-            <option value="server">Ruang server &amp; jaringan</option>
-            <option value="meeting">Rapat &amp; diskusi tim</option>
-            <option value="survey">Survei lapangan</option>
-          </select>
-        </label>
-        <label className="field">
-          Status Kegiatan
-          <select className="input" value={form.status} onChange={set('status')}>
-            <option>Selesai</option>
-            <option>Berjalan</option>
-            <option>Revisi</option>
-          </select>
+          <span className="font-mono text-[11px] normal-case tracking-normal text-muted">
+            Satu kalimat: aksi + alat + hasil. Judul dibuat otomatis kalau dikosongkan.
+          </span>
         </label>
       </div>
 
+      <button
+        type="button"
+        className="mt-3 font-mono text-xs text-muted transition-colors hover:text-brand"
+        onClick={() => setShowDetails((value) => !value)}
+        aria-expanded={showDetails}
+      >
+        {showDetails ? '▾ Sembunyikan detail' : '▸ Detail opsional (judul, foto, status)'}
+      </button>
+
+      {showDetails ? (
+        <div className="mt-3 grid gap-3.5 border-t border-line pt-3.5 min-[760px]:grid-cols-2">
+          <label className="field min-[760px]:col-span-2">
+            Judul Kegiatan (opsional)
+            <input
+              className="input"
+              placeholder="Kosongkan untuk dibuat otomatis dari deskripsi"
+              value={form.title}
+              onChange={set('title')}
+            />
+          </label>
+          <label className="field">
+            Dokumentasi Visual / Foto
+            <select className="input" value={form.photo} onChange={set('photo')}>
+              <option value="none">Tanpa foto</option>
+              <option value="coding">Sesi pengembangan / coding</option>
+              <option value="server">Ruang server &amp; jaringan</option>
+              <option value="meeting">Rapat &amp; diskusi tim</option>
+              <option value="survey">Survei lapangan</option>
+            </select>
+          </label>
+          <label className="field">
+            Status Kegiatan
+            <select className="input" value={form.status} onChange={set('status')}>
+              <option>Selesai</option>
+              <option>Berjalan</option>
+              <option>Revisi</option>
+            </select>
+          </label>
+        </div>
+      ) : null}
+
       <div className="mt-5 flex flex-wrap items-center gap-2.5">
         <button className="btn btn-y" type="submit">
-          {editing ? 'Simpan Perubahan Kegiatan' : '+ Tambah ke Jurnal Kegiatan'}
+          {editing ? 'Simpan Perubahan Kegiatan' : '+ Simpan'}
         </button>
+        {!editing ? (
+          <button className="btn btn-g" type="button" onClick={submit('next')}>
+            Simpan &amp; lanjut →
+          </button>
+        ) : null}
         {editing ? (
           <button className="btn btn-g" type="button" onClick={onCancel}>
             Batal
@@ -165,6 +370,165 @@ function JournalForm({ editing, onSubmit, onCancel }) {
         ) : null}
       </div>
     </form>
+  )
+}
+
+function WeekBatchForm({ dates, onSubmit, onCancel, lastCategory }) {
+  const [category, setCategory] = useState(() =>
+    CATEGORIES.includes(lastCategory) ? lastCategory : 'Pengembangan',
+  )
+  const [rows, setRows] = useState(() => dates.map((date) => ({ date, text: '' })))
+
+  const filled = rows.filter((row) => row.text.trim()).length
+
+  const updateRow = (index, text) => {
+    setRows((current) => current.map((row, i) => (i === index ? { ...row, text } : row)))
+  }
+
+  const handleKeyDown = (event, index) => {
+    if (event.key !== 'Enter' || event.shiftKey) return
+    event.preventDefault()
+    const next = document.getElementById(`batch-row-${index + 1}`)
+    if (next) {
+      next.focus()
+    } else {
+      event.currentTarget.form?.requestSubmit()
+    }
+  }
+
+  return (
+    <form
+      className="panel border-t-4 border-t-brand"
+      onSubmit={(event) => {
+        event.preventDefault()
+        const entries = rows
+          .filter((row) => row.text.trim())
+          .map((row) => ({
+            date: row.date,
+            category,
+            title: autoTitle(row.text),
+            desc: row.text.trim(),
+            photo: 'none',
+            status: 'Selesai',
+          }))
+        if (entries.length) onSubmit(entries)
+      }}
+    >
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
+        <div>
+          <h3 className="disp flex items-center gap-2 text-[22px] text-white">
+            <span className="h-2.5 w-2.5 bg-crimson" aria-hidden="true" />
+            Isi Seminggu Sekaligus
+          </h3>
+          <p className="font-mono text-xs text-muted">
+            Tanggal diambil dari hari kerja yang masih kosong. Kosongkan baris yang belum mau diisi.
+          </p>
+        </div>
+        <button className="btn btn-g text-xs" type="button" onClick={onCancel}>
+          Tutup
+        </button>
+      </div>
+
+      <label className="field max-w-[320px]">
+        Kategori untuk semua baris
+        <select className="input" value={category} onChange={(event) => setCategory(event.target.value)}>
+          {CATEGORIES.map((item) => (
+            <option key={item}>{item}</option>
+          ))}
+        </select>
+      </label>
+
+      <div className="mt-4 space-y-2">
+        {rows.map((row, index) => (
+          <div
+            key={row.date}
+            className="grid gap-2 border border-line bg-sub p-2.5 min-[700px]:grid-cols-[190px_1fr] min-[700px]:items-center"
+          >
+            <div className="font-mono text-xs">
+              <span className="text-brand">{fmtShort(row.date)}</span>
+              <span className="ml-2 text-muted">Hari {pklDayNumber(row.date)}</span>
+            </div>
+            <input
+              id={`batch-row-${index}`}
+              className="input py-2"
+              placeholder="Kegiatan hari itu (satu kalimat)..."
+              value={row.text}
+              onChange={(event) => updateRow(index, event.target.value)}
+              onKeyDown={(event) => handleKeyDown(event, index)}
+            />
+          </div>
+        ))}
+      </div>
+
+      <div className="mt-5 flex flex-wrap items-center gap-2.5">
+        <button className="btn btn-y" type="submit" disabled={!filled}>
+          + Simpan {filled} Kegiatan
+        </button>
+        <span className="font-mono text-[11px] text-muted">
+          Enter pindah ke baris berikutnya · Shift+Enter tetap di baris ini
+        </span>
+      </div>
+    </form>
+  )
+}
+
+function ProgressPanel({ progress, onJump }) {
+  return (
+    <div className="panel border-t-4 border-t-brand">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <div className="font-mono text-xs uppercase tracking-[0.05em] text-muted">
+            Progres Magang · {PKL_TOTAL_DAYS} Hari Kerja
+          </div>
+          <div className="mb-1 font-mono text-[11px] text-muted">
+            {PKL_RANGE_LABEL} · Senin–Jumat
+          </div>
+          <h3 className="disp text-[26px] text-white">
+            {progress.filled}/{PKL_TOTAL_DAYS}{' '}
+            <span className="text-muted">hari terisi</span>
+            {progress.missing.length ? (
+              <span className="text-crimson"> · {progress.missing.length} kosong</span>
+            ) : (
+              <span className="text-emerald-400"> · lengkap!</span>
+            )}
+          </h3>
+        </div>
+        {progress.missing.length ? (
+          <button
+            type="button"
+            className="btn btn-y text-xs"
+            onClick={() => onJump(progress.missing[0])}
+          >
+            Isi {fmtShort(progress.missing[0])} →
+          </button>
+        ) : null}
+      </div>
+
+      <div className="mt-3 h-2 w-full bg-sub">
+        <div
+          className="h-full bg-brand transition-[width] duration-300"
+          style={{ width: `${progress.percent}%` }}
+        />
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        <span className="font-mono text-[11px] uppercase text-muted">Hari kosong:</span>
+        {progress.missing.slice(0, 10).map((date) => (
+          <button
+            key={date}
+            type="button"
+            className="tag transition-colors hover:border-brand hover:text-brand"
+            onClick={() => onJump(date)}
+          >
+            {fmtShort(date)}
+          </button>
+        ))}
+        {progress.missing.length > 10 ? (
+          <span className="tag">+{progress.missing.length - 10} lagi</span>
+        ) : null}
+        {!progress.missing.length ? <span className="tag text-emerald-400">Tidak ada</span> : null}
+      </div>
+    </div>
   )
 }
 
@@ -624,6 +988,8 @@ export default function Dashboard({
   const [editP, setEditP] = useState(null)
   const [arm, setArm] = useState(null)
   const [msg, setMsg] = useState('')
+  const [jMode, setJMode] = useState('quick')
+  const [jump, setJump] = useState(null)
 
   // Filter & search untuk jurnal
   const [jMonth, setJMonth] = useState(0)
@@ -634,6 +1000,23 @@ export default function Dashboard({
     () => data.journals.filter((j) => j.memberId === effectiveMemberId).sort(byDate),
     [data.journals, effectiveMemberId],
   )
+
+  const filledDates = useMemo(() => journals.map((journal) => journal.date), [journals])
+  const lastJournal = journals.length ? journals[journals.length - 1] : null
+
+  const pklProgress = useMemo(() => {
+    const missing = missingPklDates(filledDates)
+    const filled = PKL_TOTAL_DAYS - missing.length
+    return {
+      filled,
+      missing,
+      percent: Math.round((filled / PKL_TOTAL_DAYS) * 100),
+    }
+  }, [filledDates])
+
+  const initialJournalDate = jump?.date || defaultJournalDate(filledDates)
+  const batchDates = pklProgress.missing.slice(0, 5)
+  const draftKey = `pkl-journal-draft:${effectiveMemberId}`
 
   const projects = useMemo(
     () => data.projects.filter((p) => p.memberId === effectiveMemberId),
@@ -674,6 +1057,8 @@ export default function Dashboard({
     setEditP(null)
     setArm(null)
     setMsg('')
+    setJMode('quick')
+    setJump(null)
   }
 
   const changeTab = (next) => {
@@ -682,11 +1067,24 @@ export default function Dashboard({
     setEditP(null)
     setArm(null)
     setMsg('')
+    setJMode('quick')
+    setJump(null)
   }
 
   const startEditJournal = (id) => {
     setEditJ(id)
+    setJMode('quick')
+    setJump(null)
     setMsg('')
+    setTimeout(() => {
+      document.getElementById('journal-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }, 50)
+  }
+
+  const jumpToJournalDate = (date) => {
+    setEditJ(null)
+    setJMode('quick')
+    setJump({ date, token: Date.now() })
     setTimeout(() => {
       document.getElementById('journal-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }, 50)
@@ -700,7 +1098,7 @@ export default function Dashboard({
     }, 50)
   }
 
-  const saveJournal = (form) => {
+  const saveJournal = (form, mode = 'stay') => {
     const id = editJ || `j${Date.now()}`
     api.saveJournal(
       {
@@ -716,8 +1114,36 @@ export default function Dashboard({
       },
       editJ,
     )
-    setMsg(editJ ? 'Isi kegiatan berhasil diperbarui!' : 'Kegiatan baru berhasil ditambahkan!')
+    setMsg(
+      editJ
+        ? 'Isi kegiatan berhasil diperbarui!'
+        : mode === 'next'
+          ? 'Kegiatan tersimpan. Form siap untuk tanggal berikutnya.'
+          : 'Kegiatan tersimpan. Kamu bisa tambah kegiatan lain di tanggal yang sama.',
+    )
     setEditJ(null)
+    setJump(null)
+    setTimeout(() => setMsg(''), 4000)
+  }
+
+  const saveWeek = (entries) => {
+    const stamp = Date.now()
+    entries.forEach((entry, index) => {
+      api.saveJournal({
+        id: `j${stamp}-${index}`,
+        memberId: effectiveMemberId,
+        date: entry.date,
+        month: monthOf(entry.date),
+        category: entry.category,
+        title: entry.title,
+        desc: entry.desc,
+        photo: entry.photo,
+        status: entry.status,
+      })
+    })
+    setJMode('quick')
+    setJump(null)
+    setMsg(`${entries.length} kegiatan berhasil ditambahkan sekaligus!`)
     setTimeout(() => setMsg(''), 4000)
   }
 
@@ -1015,12 +1441,57 @@ export default function Dashboard({
         {/* Tab Content: Jurnal Kegiatan */}
         {tab === 'journal' ? (
           <div>
-            <JournalForm
-              key={`${effectiveMemberId}-${editJ ?? 'new'}`}
-              editing={editingJournal}
-              onSubmit={saveJournal}
-              onCancel={() => setEditJ(null)}
-            />
+            <ProgressPanel progress={pklProgress} onJump={jumpToJournalDate} />
+
+            <div className="mb-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                className={`chip ${jMode === 'quick' ? 'chip-on' : ''}`}
+                onClick={() => setJMode('quick')}
+                aria-pressed={jMode === 'quick'}
+              >
+                ⚡ Catat Cepat
+              </button>
+              <button
+                type="button"
+                className={`chip ${jMode === 'batch' ? 'chip-on' : ''} disabled:cursor-not-allowed disabled:opacity-40`}
+                onClick={() => {
+                  setEditJ(null)
+                  setJMode('batch')
+                }}
+                disabled={!batchDates.length}
+                aria-pressed={jMode === 'batch'}
+              >
+                📅 Isi Seminggu
+              </button>
+              <span className="font-mono text-[11px] text-muted">
+                {batchDates.length
+                  ? 'Catat satu per satu, atau borongan 5 hari kosong sekaligus.'
+                  : 'Semua hari kerja sudah terisi.'}
+              </span>
+            </div>
+
+            {jMode === 'batch' && batchDates.length ? (
+              <WeekBatchForm
+                key={batchDates.join('|')}
+                dates={batchDates}
+                onSubmit={saveWeek}
+                onCancel={() => setJMode('quick')}
+                lastCategory={lastJournal?.category}
+              />
+            ) : (
+              <JournalForm
+                key={`${effectiveMemberId}-${editJ ?? 'new'}`}
+                editing={editingJournal}
+                onSubmit={saveJournal}
+                onCancel={() => setEditJ(null)}
+                initialDate={initialJournalDate}
+                jumpToken={jump?.token}
+                filledDates={filledDates}
+                lastJournal={lastJournal}
+                draftKey={draftKey}
+              />
+            )}
 
             {/* List & Filter Section */}
             <div className="panel mt-6">
@@ -1039,6 +1510,7 @@ export default function Dashboard({
                     type="button"
                     onClick={() => {
                       setEditJ(null)
+                      setJMode('quick')
                       document.getElementById('journal-form')?.scrollIntoView({ behavior: 'smooth' })
                     }}
                   >
@@ -1065,9 +1537,8 @@ export default function Dashboard({
                     onChange={(e) => setJMonth(Number(e.target.value))}
                   >
                     <option value={0}>Semua Periode Bulan</option>
-                    <option value={1}>Bulan 1 (Agustus 2026)</option>
-                    <option value={2}>Bulan 2 (September 2026)</option>
-                    <option value={3}>Bulan 3 (Oktober 2026)</option>
+                    <option value={1}>Bulan 1 (Oktober 2026)</option>
+                    <option value={2}>Bulan 2 (November 2026)</option>
                   </select>
                 </div>
                 <div className="min-[760px]:col-span-3">

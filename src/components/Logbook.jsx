@@ -135,7 +135,7 @@ export default function Logbook({
       .includes(q)
   })
 
-  const periods = ['Semua bulan', 'Bulan 1', 'Bulan 2', 'Bulan 3']
+  const periods = ['Semua bulan', 'Bulan 1 (Okt)', 'Bulan 2 (Nov)']
 
   return (
     <section id="logbook" className="bg-canvas py-14 pb-20">

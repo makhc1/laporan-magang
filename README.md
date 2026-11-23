@@ -74,10 +74,14 @@ Setiap anggota magang dapat login melalui tombol **Login Anggota** di navigasi b
 Setelah login, anggota masuk ke **Dashboard Kegiatan Magang** untuk mengelola data mereka secara mandiri:
 
 1. **Jurnal Kegiatan Harian**:
-   - Tambah kegiatan magang baru (tanggal, kategori, judul, deskripsi kegiatan, foto dokumentasi, status).
+   - **Catat Cepat**: cukup tanggal, kategori (chip), dan satu kalimat kegiatan. Judul dibuat otomatis dari deskripsi bila dikosongkan; foto/status masuk bagian *Detail opsional*.
+   - **Simpan & lanjut**: menyimpan entri lalu langsung menyiapkan tanggal kosong berikutnya. Tombol **Salin kegiatan terakhir** membantu mengisi hari yang mirip.
+   - **Draft autosave**: ketikan yang belum disimpan tetap tersimpan di browser dan dipulihkan saat form dibuka lagi.
+   - **Progres hari kerja** (1 Oktober – 30 November 2026, Senin–Jumat): jumlah hari terisi, hari kosong, progress bar, dan tombol lompat ke tanggal kosong.
+   - **Isi Seminggu**: mode borongan untuk mengisi hingga 5 hari kerja kosong sekaligus (Enter pindah baris).
    - Mengganti / edit isi kegiatan yang sudah ada.
    - Hapus kegiatan (dengan konfirmasi aman).
-   - Filter kegiatan per periode bulan (Bulan 1, Bulan 2, Bulan 3) dan status (Selesai, Berjalan, Revisi), serta pencarian teks.
+   - Filter kegiatan per periode bulan (Bulan 1 = Oktober, Bulan 2 = November) dan status (Selesai, Berjalan, Revisi), serta pencarian teks.
 2. **Featured Project & Output Magang**:
    - Tambah project magang baru (judul, metric pencapaian, mockup visual, deskripsi, tech stack).
    - Mengganti / edit isi project.
@@ -91,6 +95,8 @@ Setelah login, anggota masuk ke **Dashboard Kegiatan Magang** untuk mengelola da
    - Backup/Import seluruh data sebagai JSON atau reset ke data contoh.
    - Tombol manual sync ke database Supabase.
 
+> Periode magang diatur di `src/lib/pkl.js` melalui `PKL_START` dan `PKL_END`. Hari kerja dihitung Senin–Jumat, jadi jumlah harinya menyesuaikan rentang tanggal tersebut.
+
 ## Struktur
 
 ```
@@ -103,7 +109,8 @@ src/
     supabase.js         koneksi Supabase client, realtime, dan data mappers
     auth.js             autentikasi anggota magang & admin, session management
     useData.js          load/save Supabase + optimistic localStorage cache
-    utils.js            format tanggal, warna status, helper
+    pkl.js              periode magang (1 Okt–30 Nov), tanggal kosong, tanggal berikutnya
+    utils.js            format tanggal, warna status, judul otomatis, helper
   components/
     Nav.jsx             navigasi sticky + status login & shortcut dashboard
     Hero.jsx            hero briefing + statistik + tombol login anggota
