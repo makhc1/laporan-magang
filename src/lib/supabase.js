@@ -145,9 +145,15 @@ export async function syncAllToSupabase(data) {
     const dbProjects = data.projects.map(mappers.project.toDb)
 
     const [mRes, jRes, pRes] = await Promise.all([
-      supabase.from('members').upsert(dbMembers),
-      supabase.from('journals').upsert(dbJournals),
-      supabase.from('projects').upsert(dbProjects),
+      dbMembers.length
+        ? supabase.from('members').upsert(dbMembers)
+        : Promise.resolve({ error: null }),
+      dbJournals.length
+        ? supabase.from('journals').upsert(dbJournals)
+        : Promise.resolve({ error: null }),
+      dbProjects.length
+        ? supabase.from('projects').upsert(dbProjects)
+        : Promise.resolve({ error: null }),
     ])
 
     if (mRes.error || jRes.error || pRes.error) {

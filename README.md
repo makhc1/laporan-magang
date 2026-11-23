@@ -30,7 +30,7 @@ Aplikasi ini sudah siap terhubung ke **Supabase** agar seluruh perubahan kegiata
 1. Buat project baru secara gratis di [supabase.com](https://supabase.com).
 2. Di dashboard Supabase, buka menu **SQL Editor** &rarr; **New Query**.
 3. Buka file [supabase/schema.sql](file:///home/ahmad/Dokumen/CODE/magang_++/supabase/schema.sql) di project ini, salin seluruh kodenya, tempel ke SQL Editor Supabase, lalu klik **Run**.
-   - Skrip ini otomatis membuat tabel `members`, `journals`, `projects`, mengatur RLS policy, mengaktifkan Realtime, serta mengisi data awal (*seed*).
+   - Skrip ini otomatis membuat tabel `members`, `journals`, `projects`, mengatur RLS policy, mengaktifkan Realtime, serta mengisi akun anggota awal. Jurnal dan project sengaja dibiarkan kosong agar bisa diinput sendiri.
 4. Buat file `.env.local` di folder project ini (bisa salin dari `.env.example`):
    ```bash
    cp .env.example .env.local
@@ -92,7 +92,7 @@ Setelah login, anggota masuk ke **Dashboard Kegiatan Magang** untuk mengelola da
 4. **Fitur Tambahan Super Admin**:
    - Switcher untuk mengelola kegiatan semua anggota.
    - Tambah contestant/anggota magang baru ke arena.
-   - Backup/Import seluruh data sebagai JSON atau reset ke data contoh.
+   - Backup/Import seluruh data sebagai JSON atau kosongkan semua jurnal &amp; project (akun anggota tetap tersimpan).
    - Tombol manual sync ke database Supabase.
 
 > Periode magang diatur di `src/lib/pkl.js` melalui `PKL_START` dan `PKL_END`. Hari kerja dihitung Senin–Jumat, jadi jumlah harinya menyesuaikan rentang tanggal tersebut.
@@ -104,7 +104,7 @@ src/
   main.jsx              entry React + BrowserRouter
   App.jsx               halaman squad: routing, auth session, view coordinator
   index.css             Tailwind theme + komponen (.btn, .chip, .tl, stage)
-  data/seed.js          data contoh: 5 anggota, 30 jurnal, 10 project
+  data/seed.js          akun 5 anggota; jurnal & project mulai kosong
   lib/
     supabase.js         koneksi Supabase client, realtime, dan data mappers
     auth.js             autentikasi anggota magang & admin, session management

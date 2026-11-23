@@ -858,7 +858,7 @@ function AddForm({ onSubmit }) {
   )
 }
 
-function BackupPanel({ data, onImport, onReset, setMsg, isSupabaseConfigured, syncStatus, onSyncSupabase }) {
+function BackupPanel({ data, onImport, onClear, setMsg, isSupabaseConfigured, syncStatus, onSyncSupabase }) {
   const [text, setText] = useState(() => JSON.stringify(data, null, 2))
   const [armed, setArmed] = useState(false)
   const fileRef = useRef(null)
@@ -888,7 +888,8 @@ function BackupPanel({ data, onImport, onReset, setMsg, isSupabaseConfigured, sy
       <h3 className="disp mb-2 text-[22px] text-white">Backup &amp; Import Data JSON</h3>
       <p className="mb-3.5 text-sm text-muted">
         Salin data JSON di bawah untuk memindahkan data kegiatan magang ke perangkat lain, atau
-        unggah berkas JSON untuk memulihkan data.
+        unggah berkas JSON untuk memulihkan data. Tombol kosongkan menghapus semua jurnal dan
+        project (lokal + Supabase), tetapi akun anggota tetap tersimpan.
       </p>
       <label className="field">
         Data JSON
@@ -916,18 +917,18 @@ function BackupPanel({ data, onImport, onReset, setMsg, isSupabaseConfigured, sy
           onChange={readFile}
         />
         <button
-          className="btn btn-g"
+          className="btn btn-r"
           onClick={() => {
             if (!armed) {
               setArmed(true)
-              setMsg('Klik sekali lagi untuk mengembalikan semua data contoh awal.')
+              setMsg('Klik sekali lagi untuk mengosongkan semua jurnal dan project.')
               return
             }
             setArmed(false)
-            onReset()
+            onClear()
           }}
         >
-          {armed ? 'Yakin kembalikan data contoh?' : 'Kembalikan Data Contoh'}
+          {armed ? 'Yakin kosongkan semua?' : 'Kosongkan Jurnal & Project'}
         </button>
       </div>
 
@@ -1016,7 +1017,7 @@ export default function Dashboard({
 
   const initialJournalDate = jump?.date || defaultJournalDate(filledDates)
   const batchDates = pklProgress.missing.slice(0, 5)
-  const draftKey = `pkl-journal-draft:${effectiveMemberId}`
+  const draftKey = `pkl-journal-draft-v2:${effectiveMemberId}`
 
   const projects = useMemo(
     () => data.projects.filter((p) => p.memberId === effectiveMemberId),
@@ -1266,12 +1267,19 @@ export default function Dashboard({
     }
   }
 
-  const resetData = () => {
-    api.reset()
+  const clearData = async () => {
+    setMsg('Mengosongkan semua jurnal dan project...')
+    const res = await api.clearData()
     setEditJ(null)
     setEditP(null)
     setArm(null)
-    setMsg('Data contoh awal berhasil dipulihkan.')
+    setJump(null)
+    setMsg(
+      res.success
+        ? 'Semua jurnal dan project berhasil dikosongkan. Akun anggota tetap tersimpan.'
+        : `Gagal mengosongkan data: ${res.error}`,
+    )
+    setTimeout(() => setMsg(''), 5000)
   }
 
   const handleSyncSupabase = async () => {
@@ -1746,7 +1754,7 @@ export default function Dashboard({
           <BackupPanel
             data={data}
             onImport={importJson}
-            onReset={resetData}
+            onClear={clearData}
             setMsg={setMsg}
             isSupabaseConfigured={isSupabaseConfigured}
             syncStatus={syncStatus}

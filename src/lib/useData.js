@@ -8,7 +8,7 @@ import {
   syncAllToSupabase,
 } from './supabase'
 
-const KEY = 'finals-pkl-v1'
+const KEY = 'finals-pkl-v2'
 
 function loadLocal() {
   try {
@@ -256,12 +256,28 @@ export function useData() {
     }
   }, [])
 
-  const reset = useCallback(() => {
-    const fresh = seed()
-    setData(fresh)
-    if (isSupabaseConfigured()) {
-      syncAllToSupabase(fresh)
+  const clearData = useCallback(async () => {
+    setData((d) => ({ ...d, journals: [], projects: [] }))
+
+    // Bersihkan draft form yang belum tersimpan.
+    try {
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith('pkl-journal-draft'))
+        .forEach((key) => localStorage.removeItem(key))
+    } catch {
+      /* localStorage tidak tersedia */
     }
+
+    if (isSupabaseConfigured() && supabase) {
+      const [journalsRes, projectsRes] = await Promise.all([
+        supabase.from('journals').delete().neq('id', ''),
+        supabase.from('projects').delete().neq('id', ''),
+      ])
+      const error = journalsRes.error || projectsRes.error
+      if (error) return { success: false, error: error.message }
+    }
+
+    return { success: true }
   }, [])
 
   const api = useMemo(
@@ -276,7 +292,7 @@ export function useData() {
       removeMember,
       syncLocalToSupabase,
       importData,
-      reset,
+      clearData,
     }),
     [
       saveJournal,
@@ -289,7 +305,7 @@ export function useData() {
       removeMember,
       syncLocalToSupabase,
       importData,
-      reset,
+      clearData,
     ],
   )
 
