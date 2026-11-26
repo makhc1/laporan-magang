@@ -24,6 +24,11 @@
     color-scheme: dark;
   }
 
+  /* Saat smooth scroll inersial JS aktif, matikan scroll-behavior CSS agar tidak bentrok */
+  html.smooth-scroll-active {
+    scroll-behavior: auto;
+  }
+
   body {
     @apply overflow-x-hidden bg-canvas font-body text-base text-ink antialiased;
   }
@@ -242,6 +247,95 @@
 .breathe {
   transform-origin: 50% 100%;
   animation: breathe 1.8s ease-in-out infinite;
+}
+
+.spawn-pad-plane {
+  transform: perspective(640px) rotateX(75deg);
+  transform-style: preserve-3d;
+}
+
+.spawn-beam {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--aura) 38%, transparent) 18%,
+    color-mix(in srgb, #facc15 55%, var(--aura)) 38%,
+    rgba(255, 255, 255, 0.92) 50%,
+    color-mix(in srgb, #facc15 55%, var(--aura)) 62%,
+    color-mix(in srgb, var(--aura) 38%, transparent) 82%,
+    transparent 100%
+  );
+  mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 88%, transparent 100%);
+  -webkit-mask-image: linear-gradient(180deg, transparent 0%, #000 18%, #000 88%, transparent 100%);
+  mix-blend-mode: screen;
+}
+
+@keyframes spawn-reticle-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.spawn-reticle-spin {
+  animation: spawn-reticle-spin 16s linear infinite;
+}
+
+@keyframes spawn-ambient-rise {
+  0% {
+    transform: translateY(0) rotate(45deg) scale(0.4);
+    opacity: 0;
+  }
+  18% {
+    opacity: 0.72;
+  }
+  80% {
+    opacity: 0.35;
+  }
+  100% {
+    transform: translateY(-230px) rotate(225deg) scale(0.15);
+    opacity: 0;
+  }
+}
+
+.spawn-ambient-mote {
+  animation: spawn-ambient-rise 3s ease-out infinite;
+}
+
+/* ---------- game loading screen bar ---------- */
+.loader-track {
+  clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 0 100%);
+}
+
+.loader-ticks {
+  background-image: repeating-linear-gradient(
+    90deg,
+    transparent 0 calc(10% - 1px),
+    rgba(255, 255, 255, 0.1) calc(10% - 1px) 10%
+  );
+}
+
+.loader-fill {
+  background: linear-gradient(90deg, #dc2626 0%, #facc15 62%, #fef08a 100%);
+  box-shadow: 0 0 22px rgba(250, 204, 21, 0.45);
+}
+
+@keyframes loader-sheen-slide {
+  from {
+    background-position: 0 0;
+  }
+  to {
+    background-position: 64px 0;
+  }
+}
+
+.loader-sheen {
+  background-image: repeating-linear-gradient(
+    -55deg,
+    rgba(255, 255, 255, 0.22) 0 10px,
+    transparent 10px 22px
+  );
+  background-size: 64px 64px;
+  animation: loader-sheen-slide 0.9s linear infinite;
 }
 
 /* ---------- logbook ---------- */

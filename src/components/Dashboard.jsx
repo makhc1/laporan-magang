@@ -13,7 +13,7 @@ import Tri from './Tri'
 import Mockup from './Mockup'
 import Photo from './Photo'
 
-const HAIR = ['buzz', 'spike', 'side', 'curly', 'cap']
+const HAIR = ['curly', 'spike', 'side', 'crop', 'beard', 'buzz', 'cap']
 const SKIN = ['#d9a07a', '#c68b64', '#e3b48f', '#b9805b', '#e0ac86']
 
 const JOURNAL_DEFAULTS = {
@@ -56,7 +56,7 @@ const blankJournal = (date, category) => ({
 
 const readDraft = (key) => {
   try {
-    const raw = key ? localStorage.getItem(key) : null
+    const raw = key ? sessionStorage.getItem(key) : null
     return raw ? JSON.parse(raw) : null
   } catch {
     return null
@@ -93,6 +93,7 @@ function JournalForm({
   const [form, setForm] = useState(initialForm)
   const [showDetails, setShowDetails] = useState(Boolean(editing))
   const [showCustomCat, setShowCustomCat] = useState(() => !CATEGORIES.includes(form.category))
+  const [saving, setSaving] = useState(false)
   const descRef = useRef(null)
   const customCatRef = useRef(null)
 
@@ -116,17 +117,17 @@ function JournalForm({
     setForm((current) => ({ ...current, date: initialDate }))
   }, [jumpToken]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Draft autosave: entri yang belum disimpan tidak hilang saat refresh.
+  // Draft sementara selama tab terbuka agar ketikan tidak hilang saat refresh.
   useEffect(() => {
     if (editing || !draftKey) return
     try {
       if (!form.desc.trim() && !form.title.trim()) {
-        localStorage.removeItem(draftKey)
+        sessionStorage.removeItem(draftKey)
         return
       }
-      localStorage.setItem(draftKey, JSON.stringify(form))
+      sessionStorage.setItem(draftKey, JSON.stringify(form))
     } catch {
-      /* localStorage penuh / tidak tersedia */
+      /* sessionStorage tidak tersedia */
     }
   }, [form, editing, draftKey])
 
@@ -134,7 +135,7 @@ function JournalForm({
 
   const resetAfterSave = (mode) => {
     try {
-      if (draftKey) localStorage.removeItem(draftKey)
+      if (draftKey) sessionStorage.removeItem(draftKey)
     } catch {
       /* ignore */
     }
@@ -149,8 +150,10 @@ function JournalForm({
     setShowCustomCat(!CATEGORIES.includes(form.category))
   }
 
-  const submit = (mode) => (event) => {
+  const submit = (mode) => async (event) => {
     event.preventDefault()
+    if (saving) return
+
     const desc = form.desc.trim()
 
     if (!desc) {
@@ -158,7 +161,8 @@ function JournalForm({
       return
     }
 
-    onSubmit(
+    setSaving(true)
+    const ok = await onSubmit(
       {
         ...form,
         category: form.category.trim() || 'Pengembangan',
@@ -167,8 +171,9 @@ function JournalForm({
       },
       mode,
     )
+    setSaving(false)
 
-    if (!editing) resetAfterSave(mode)
+    if (ok !== false && !editing) resetAfterSave(mode)
   }
 
   const copyLast = () => {
@@ -242,7 +247,7 @@ function JournalForm({
             <span className="font-mono text-[11px] normal-case tracking-normal text-muted">
               {editing
                 ? 'Simpan perubahan setelah selesai mengedit.'
-                : 'Draft tersimpan otomatis di browser ini.'}
+                : 'Tersimpan langsung ke database Supabase.'}
             </span>
           </div>
         </div>
@@ -355,16 +360,21 @@ function JournalForm({
       ) : null}
 
       <div className="mt-5 flex flex-wrap items-center gap-2.5">
-        <button className="btn btn-y" type="submit">
-          {editing ? 'Simpan Perubahan Kegiatan' : '+ Simpan'}
+        <button className="btn btn-y disabled:cursor-not-allowed disabled:opacity-50" type="submit" disabled={saving}>
+          {saving ? 'Menyimpan...' : editing ? 'Simpan Perubahan Kegiatan' : '+ Simpan'}
         </button>
         {!editing ? (
-          <button className="btn btn-g" type="button" onClick={submit('next')}>
-            Simpan &amp; lanjut →
+          <button
+            className="btn btn-g disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            disabled={saving}
+            onClick={submit('next')}
+          >
+            {saving ? 'Menyimpan...' : 'Simpan & lanjut →'}
           </button>
         ) : null}
         {editing ? (
-          <button className="btn btn-g" type="button" onClick={onCancel}>
+          <button className="btn btn-g" type="button" disabled={saving} onClick={onCancel}>
             Batal
           </button>
         ) : null}
@@ -378,6 +388,7 @@ function WeekBatchForm({ dates, onSubmit, onCancel, lastCategory }) {
     CATEGORIES.includes(lastCategory) ? lastCategory : 'Pengembangan',
   )
   const [rows, setRows] = useState(() => dates.map((date) => ({ date, text: '' })))
+  const [saving, setSaving] = useState(false)
 
   const filled = rows.filter((row) => row.text.trim()).length
 
@@ -399,8 +410,9 @@ function WeekBatchForm({ dates, onSubmit, onCancel, lastCategory }) {
   return (
     <form
       className="panel border-t-4 border-t-brand"
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault()
+        if (saving) return
         const entries = rows
           .filter((row) => row.text.trim())
           .map((row) => ({
@@ -411,7 +423,10 @@ function WeekBatchForm({ dates, onSubmit, onCancel, lastCategory }) {
             photo: 'none',
             status: 'Selesai',
           }))
-        if (entries.length) onSubmit(entries)
+        if (!entries.length) return
+        setSaving(true)
+        await onSubmit(entries)
+        setSaving(false)
       }}
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
@@ -461,8 +476,12 @@ function WeekBatchForm({ dates, onSubmit, onCancel, lastCategory }) {
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2.5">
-        <button className="btn btn-y" type="submit" disabled={!filled}>
-          + Simpan {filled} Kegiatan
+        <button
+          className="btn btn-y disabled:cursor-not-allowed disabled:opacity-50"
+          type="submit"
+          disabled={!filled || saving}
+        >
+          {saving ? 'Menyimpan...' : `+ Simpan ${filled} Kegiatan`}
         </button>
         <span className="font-mono text-[11px] text-muted">
           Enter pindah ke baris berikutnya · Shift+Enter tetap di baris ini
@@ -544,6 +563,7 @@ function ProjectForm({ editing, onSubmit, onCancel }) {
         }
       : PROJECT_DEFAULTS,
   )
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (editing) {
@@ -565,9 +585,15 @@ function ProjectForm({ editing, onSubmit, onCancel }) {
       className={`panel transition-all ${
         editing ? 'border-2 border-brand bg-[#1c1b12]' : 'border-t-4 border-t-brand'
       }`}
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault()
-        onSubmit(form)
+        if (saving) return
+        setSaving(true)
+        const ok = await onSubmit(form)
+        setSaving(false)
+        if (ok !== false && !editing) {
+          setForm(PROJECT_DEFAULTS)
+        }
       }}
     >
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-line pb-3">
@@ -644,11 +670,19 @@ function ProjectForm({ editing, onSubmit, onCancel }) {
       </div>
 
       <div className="mt-5 flex flex-wrap items-center gap-2.5">
-        <button className="btn btn-y" type="submit">
-          {editing ? 'Simpan Perubahan Project' : '+ Tambah Project Magang'}
+        <button
+          className="btn btn-y disabled:cursor-not-allowed disabled:opacity-50"
+          type="submit"
+          disabled={saving}
+        >
+          {saving
+            ? 'Menyimpan...'
+            : editing
+              ? 'Simpan Perubahan Project'
+              : '+ Tambah Project Magang'}
         </button>
         {editing ? (
-          <button className="btn btn-g" type="button" onClick={onCancel}>
+          <button className="btn btn-g" type="button" disabled={saving} onClick={onCancel}>
             Batal
           </button>
         ) : null}
@@ -668,26 +702,37 @@ function ProfileForm({ member, onSave, onChangePassword, onRemove, removeArmed, 
   })
 
   const [newPassword, setNewPassword] = useState('')
-  const [passMsg, setPassMsg] = useState('')
+  const [passMsg, setPassMsg] = useState(null)
+  const [saving, setSaving] = useState(false)
+  const [savingPass, setSavingPass] = useState(false)
 
   const set = (key) => (event) => setForm((f) => ({ ...f, [key]: event.target.value }))
 
-  const handlePasswordSubmit = (e) => {
+  const handlePasswordSubmit = async (e) => {
     e.preventDefault()
-    if (!newPassword.trim()) return
-    onChangePassword(newPassword.trim())
-    setNewPassword('')
-    setPassMsg('Password login berhasil diperbarui!')
-    setTimeout(() => setPassMsg(''), 4000)
+    if (!newPassword.trim() || savingPass) return
+    setSavingPass(true)
+    const ok = await onChangePassword(newPassword.trim())
+    setSavingPass(false)
+    if (ok !== false) {
+      setNewPassword('')
+      setPassMsg({ type: 'success', text: 'Password login berhasil diperbarui di Supabase!' })
+    } else {
+      setPassMsg({ type: 'error', text: 'Gagal memperbarui password di Supabase.' })
+    }
+    setTimeout(() => setPassMsg(null), 4000)
   }
 
   return (
     <div className="grid gap-6 lg:grid-cols-12">
       <form
         className="panel lg:col-span-8"
-        onSubmit={(event) => {
+        onSubmit={async (event) => {
           event.preventDefault()
-          onSave(form)
+          if (saving) return
+          setSaving(true)
+          await onSave(form)
+          setSaving(false)
         }}
       >
         <h3 className="disp mb-4 text-[22px] text-white">Profil Anggota Magang</h3>
@@ -737,11 +782,15 @@ function ProfileForm({ member, onSave, onChangePassword, onRemove, removeArmed, 
         </div>
 
         <div className="mt-5 flex flex-wrap gap-2.5">
-          <button className="btn btn-y" type="submit">
-            Simpan Perubahan Profil
+          <button
+            className="btn btn-y disabled:cursor-not-allowed disabled:opacity-50"
+            type="submit"
+            disabled={saving}
+          >
+            {saving ? 'Menyimpan...' : 'Simpan Perubahan Profil'}
           </button>
           {isAdmin ? (
-            <button className="btn btn-g" type="button" onClick={onRemove}>
+            <button className="btn btn-g" type="button" disabled={saving} onClick={onRemove}>
               {removeArmed ? 'Yakin hapus contestant ini?' : 'Hapus contestant'}
             </button>
           ) : null}
@@ -769,13 +818,22 @@ function ProfileForm({ member, onSave, onChangePassword, onRemove, removeArmed, 
           </label>
 
           {passMsg ? (
-            <div className="mt-2 font-mono text-xs text-brand" role="status">
-              {passMsg}
+            <div
+              className={`mt-2 font-mono text-xs ${
+                passMsg.type === 'error' ? 'text-alert' : 'text-brand'
+              }`}
+              role={passMsg.type === 'error' ? 'alert' : 'status'}
+            >
+              {passMsg.text}
             </div>
           ) : null}
 
-          <button className="btn btn-y mt-4 w-full" type="submit">
-            Perbarui Password
+          <button
+            className="btn btn-y mt-4 w-full disabled:cursor-not-allowed disabled:opacity-50"
+            type="submit"
+            disabled={savingPass}
+          >
+            {savingPass ? 'Menyimpan...' : 'Perbarui Password'}
           </button>
         </form>
 
@@ -796,15 +854,19 @@ function AddForm({ onSubmit }) {
     aura: '#facc15',
     bio: '',
   })
+  const [saving, setSaving] = useState(false)
 
   const set = (key) => (event) => setForm((f) => ({ ...f, [key]: event.target.value }))
 
   return (
     <form
       className="panel"
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault()
-        onSubmit(form)
+        if (saving) return
+        setSaving(true)
+        await onSubmit(form)
+        setSaving(false)
       }}
     >
       <h3 className="disp mb-4 text-[22px] text-white">Tambah Anggota Magang Baru</h3>
@@ -850,15 +912,29 @@ function AddForm({ onSubmit }) {
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2.5">
-        <button className="btn btn-y" type="submit">
-          + Tambah ke Squad Arena
+        <button
+          className="btn btn-y disabled:cursor-not-allowed disabled:opacity-50"
+          type="submit"
+          disabled={saving}
+        >
+          {saving ? 'Menyimpan...' : '+ Tambah ke Squad Arena'}
         </button>
       </div>
     </form>
   )
 }
 
-function BackupPanel({ data, onImport, onClear, setMsg, isSupabaseConfigured, syncStatus, onSyncSupabase }) {
+function BackupPanel({
+  data,
+  onImport,
+  onClear,
+  setMsg,
+  isSupabaseConfigured,
+  syncStatus,
+  syncError,
+  isSyncing,
+  onRefreshSupabase,
+}) {
   const [text, setText] = useState(() => JSON.stringify(data, null, 2))
   const [armed, setArmed] = useState(false)
   const fileRef = useRef(null)
@@ -870,7 +946,7 @@ function BackupPanel({ data, onImport, onClear, setMsg, isSupabaseConfigured, sy
   const copy = () => {
     navigator.clipboard?.writeText(text).then(
       () => setMsg('JSON disalin ke clipboard.'),
-      () => setMsg('Gagal menyalin otomatis. Tekan Ctrl+C pada teks.'),
+      () => setMsg('Gagal menyalin otomatis. Tekan Ctrl+C pada teks.', 'error'),
     )
   }
 
@@ -887,9 +963,9 @@ function BackupPanel({ data, onImport, onClear, setMsg, isSupabaseConfigured, sy
     <div className="panel">
       <h3 className="disp mb-2 text-[22px] text-white">Backup &amp; Import Data JSON</h3>
       <p className="mb-3.5 text-sm text-muted">
-        Salin data JSON di bawah untuk memindahkan data kegiatan magang ke perangkat lain, atau
-        unggah berkas JSON untuk memulihkan data. Tombol kosongkan menghapus semua jurnal dan
-        project (lokal + Supabase), tetapi akun anggota tetap tersimpan.
+        Salin data JSON di bawah sebagai cadangan, atau unggah berkas JSON untuk memulihkan data
+        langsung ke Supabase. Tombol kosongkan menghapus semua jurnal dan project di database
+        Supabase, sedangkan akun anggota tetap tersimpan.
       </p>
       <label className="field">
         Data JSON
@@ -900,13 +976,23 @@ function BackupPanel({ data, onImport, onClear, setMsg, isSupabaseConfigured, sy
         />
       </label>
       <div className="mt-4 flex flex-wrap gap-2.5">
-        <button className="btn btn-y" onClick={copy}>
+        <button className="btn btn-y" type="button" onClick={copy}>
           Salin JSON
         </button>
-        <button className="btn btn-r" onClick={() => onImport(text)}>
-          Impor dari Teks di Atas
+        <button
+          className="btn btn-r disabled:cursor-not-allowed disabled:opacity-50"
+          type="button"
+          disabled={isSyncing}
+          onClick={() => onImport(text)}
+        >
+          {isSyncing ? 'Memproses...' : 'Impor ke Supabase'}
         </button>
-        <button className="btn btn-g" onClick={() => fileRef.current?.click()}>
+        <button
+          className="btn btn-g disabled:cursor-not-allowed disabled:opacity-50"
+          type="button"
+          disabled={isSyncing}
+          onClick={() => fileRef.current?.click()}
+        >
           Unggah Berkas .json
         </button>
         <input
@@ -917,11 +1003,13 @@ function BackupPanel({ data, onImport, onClear, setMsg, isSupabaseConfigured, sy
           onChange={readFile}
         />
         <button
-          className="btn btn-r"
+          className="btn btn-r disabled:cursor-not-allowed disabled:opacity-50"
+          type="button"
+          disabled={isSyncing}
           onClick={() => {
             if (!armed) {
               setArmed(true)
-              setMsg('Klik sekali lagi untuk mengosongkan semua jurnal dan project.')
+              setMsg('Klik sekali lagi untuk mengosongkan semua jurnal dan project di Supabase.', 'info')
               return
             }
             setArmed(false)
@@ -932,27 +1020,42 @@ function BackupPanel({ data, onImport, onClear, setMsg, isSupabaseConfigured, sy
         </button>
       </div>
 
-      {/* Supabase Cloud Database Info & Sync */}
+      {/* Supabase Cloud Database Info & Refresh */}
       <div className="mt-8 border-t border-line pt-6">
         <h4 className="disp text-[19px] text-white">Database Cloud (Supabase)</h4>
         {isSupabaseConfigured ? (
           <div className="mt-2">
             <p className="mb-3 text-xs text-muted">
-              Supabase aktif dan terhubung ({syncStatus}). Seluruh perubahan jurnal dan project tersimpan secara online ke Supabase secara real-time.
+              Status koneksi: <strong className="text-zinc-200">{syncStatus}</strong>. Semua data
+              anggota, jurnal, dan project dibaca serta disimpan langsung ke PostgreSQL Supabase
+              dengan pembaruan real-time.
             </p>
-            <button className="btn btn-y" onClick={onSyncSupabase}>
-              ☁️ Unggah Semua Data Saat Ini ke Supabase
+            {syncError ? (
+              <div
+                className="mb-3 border border-alert/40 bg-alert/10 p-3 font-mono text-xs text-red-200"
+                role="alert"
+              >
+                {syncError}
+              </div>
+            ) : null}
+            <button
+              className="btn btn-y disabled:cursor-not-allowed disabled:opacity-50"
+              type="button"
+              disabled={isSyncing}
+              onClick={onRefreshSupabase}
+            >
+              {isSyncing ? 'Menyinkronkan...' : 'Muat Ulang Data dari Supabase'}
             </button>
           </div>
         ) : (
-          <div className="mt-3 border border-brand/30 bg-brand/5 p-4 font-mono text-xs text-zinc-300">
-            <p className="mb-2 font-semibold text-brand">💡 Ingin Mengaktifkan Supabase Database (Multi-Device)?</p>
+          <div className="mt-3 border border-alert/40 bg-alert/10 p-4 font-mono text-xs text-zinc-200">
+            <p className="mb-2 font-semibold text-alert">Konfigurasi Supabase bermasalah</p>
+            {syncError ? <p className="mb-3 text-red-200">{syncError}</p> : null}
             <ol className="list-inside list-decimal space-y-1.5 text-[11px] text-muted">
-              <li>Buat project baru di <strong className="text-white">supabase.com</strong>.</li>
-              <li>Buka <strong className="text-white">SQL Editor</strong> di Supabase, lalu jalankan skrip di file <strong className="text-brand">supabase/schema.sql</strong>.</li>
-              <li>Buat file <strong className="text-white">.env.local</strong> (bisa salin dari <strong className="text-white">.env.example</strong>).</li>
-              <li>Isi <strong className="text-white">VITE_SUPABASE_URL</strong> dan <strong className="text-white">VITE_SUPABASE_ANON_KEY</strong> dari Project Settings &rarr; API.</li>
-              <li>Restart dev server (<code className="text-brand">npm run dev</code>). Database otomatis tersinkronisasi online!</li>
+              <li>Buat project di <strong className="text-white">supabase.com</strong>.</li>
+              <li>Buka <strong className="text-white">SQL Editor</strong>, lalu jalankan skrip <strong className="text-brand">supabase/schema.sql</strong>.</li>
+              <li>Isi <strong className="text-white">VITE_SUPABASE_URL</strong> dan <strong className="text-white">VITE_SUPABASE_ANON_KEY</strong> (gunakan <strong className="text-brand">Publishable Key sb_publishable_...</strong> atau Legacy Anon Key, bukan <code className="text-alert">sb_secret_...</code>) di <strong className="text-white">.env</strong>.</li>
+              <li>Restart dev server (<code className="text-brand">npm run dev</code>).</li>
             </ol>
           </div>
         )}
@@ -967,6 +1070,8 @@ export default function Dashboard({
   api,
   memberId,
   syncStatus,
+  syncError,
+  isSyncing,
   isSupabaseConfigured,
   onMemberChange,
   onClose,
@@ -988,9 +1093,34 @@ export default function Dashboard({
   const [editJ, setEditJ] = useState(null)
   const [editP, setEditP] = useState(null)
   const [arm, setArm] = useState(null)
-  const [msg, setMsg] = useState('')
+  const [feedback, setFeedback] = useState(null)
   const [jMode, setJMode] = useState('quick')
   const [jump, setJump] = useState(null)
+  const feedbackTimerRef = useRef(null)
+
+  const setMsg = (text, type = 'success', duration = 4500) => {
+    if (feedbackTimerRef.current) {
+      window.clearTimeout(feedbackTimerRef.current)
+      feedbackTimerRef.current = null
+    }
+    if (!text) {
+      setFeedback(null)
+      return
+    }
+    setFeedback({ type, text })
+    if (duration > 0) {
+      feedbackTimerRef.current = window.setTimeout(() => {
+        setFeedback(null)
+        feedbackTimerRef.current = null
+      }, duration)
+    }
+  }
+
+  useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) window.clearTimeout(feedbackTimerRef.current)
+    }
+  }, [])
 
   // Filter & search untuk jurnal
   const [jMonth, setJMonth] = useState(0)
@@ -1099,9 +1229,9 @@ export default function Dashboard({
     }, 50)
   }
 
-  const saveJournal = (form, mode = 'stay') => {
+  const saveJournal = async (form, mode = 'stay') => {
     const id = editJ || `j${Date.now()}`
-    api.saveJournal(
+    const res = await api.saveJournal(
       {
         id,
         memberId: effectiveMemberId,
@@ -1115,42 +1245,51 @@ export default function Dashboard({
       },
       editJ,
     )
+    if (!res.success) {
+      setMsg(`Gagal menyimpan kegiatan ke Supabase: ${res.error}`, 'error', 6000)
+      return false
+    }
     setMsg(
       editJ
-        ? 'Isi kegiatan berhasil diperbarui!'
+        ? 'Isi kegiatan berhasil diperbarui di Supabase!'
         : mode === 'next'
-          ? 'Kegiatan tersimpan. Form siap untuk tanggal berikutnya.'
-          : 'Kegiatan tersimpan. Kamu bisa tambah kegiatan lain di tanggal yang sama.',
+          ? 'Kegiatan tersimpan ke Supabase. Form siap untuk tanggal berikutnya.'
+          : 'Kegiatan tersimpan ke Supabase. Kamu bisa tambah kegiatan lain di tanggal yang sama.',
     )
     setEditJ(null)
     setJump(null)
-    setTimeout(() => setMsg(''), 4000)
+    return true
   }
 
-  const saveWeek = (entries) => {
+  const saveWeek = async (entries) => {
     const stamp = Date.now()
-    entries.forEach((entry, index) => {
-      api.saveJournal({
-        id: `j${stamp}-${index}`,
-        memberId: effectiveMemberId,
-        date: entry.date,
-        month: monthOf(entry.date),
-        category: entry.category,
-        title: entry.title,
-        desc: entry.desc,
-        photo: entry.photo,
-        status: entry.status,
-      })
-    })
+    const payload = entries.map((entry, index) => ({
+      id: `j${stamp}-${index}`,
+      memberId: effectiveMemberId,
+      date: entry.date,
+      month: monthOf(entry.date),
+      category: entry.category,
+      title: entry.title,
+      desc: entry.desc,
+      photo: entry.photo,
+      status: entry.status,
+    }))
+
+    const res = await api.saveJournals(payload)
+    if (!res.success) {
+      setMsg(`Gagal menyimpan kegiatan mingguan ke Supabase: ${res.error}`, 'error', 6000)
+      return false
+    }
+
     setJMode('quick')
     setJump(null)
-    setMsg(`${entries.length} kegiatan berhasil ditambahkan sekaligus!`)
-    setTimeout(() => setMsg(''), 4000)
+    setMsg(`${entries.length} kegiatan berhasil disimpan ke Supabase!`)
+    return true
   }
 
-  const saveProject = (form) => {
+  const saveProject = async (form) => {
     const id = editP || `p${Date.now()}`
-    api.saveProject(
+    const res = await api.saveProject(
       {
         id,
         memberId: effectiveMemberId,
@@ -1165,24 +1304,40 @@ export default function Dashboard({
       },
       editP,
     )
-    setMsg(editP ? 'Isi project berhasil diperbarui!' : 'Project baru berhasil ditambahkan!')
+    if (!res.success) {
+      setMsg(`Gagal menyimpan project ke Supabase: ${res.error}`, 'error', 6000)
+      return false
+    }
+    setMsg(
+      editP
+        ? 'Isi project berhasil diperbarui di Supabase!'
+        : 'Project baru berhasil disimpan ke Supabase!',
+    )
     setEditP(null)
-    setTimeout(() => setMsg(''), 4000)
+    return true
   }
 
-  const saveProfile = (form) => {
-    api.saveProfile(effectiveMemberId, form)
-    setMsg('Profil berhasil disimpan!')
-    setTimeout(() => setMsg(''), 4000)
+  const saveProfile = async (form) => {
+    const res = await api.saveProfile(effectiveMemberId, form)
+    if (!res.success) {
+      setMsg(`Gagal menyimpan profil ke Supabase: ${res.error}`, 'error', 6000)
+      return false
+    }
+    setMsg('Profil berhasil disimpan ke Supabase!')
+    return true
   }
 
-  const changePassword = (pass) => {
-    api.changePassword(effectiveMemberId, pass)
-    setMsg('Password login berhasil diperbarui!')
-    setTimeout(() => setMsg(''), 4000)
+  const changePassword = async (pass) => {
+    const res = await api.changePassword(effectiveMemberId, pass)
+    if (!res.success) {
+      setMsg(`Gagal memperbarui password di Supabase: ${res.error}`, 'error', 6000)
+      return false
+    }
+    setMsg('Password login berhasil diperbarui di Supabase!')
+    return true
   }
 
-  const addMember = (form) => {
+  const addMember = async (form) => {
     const index = data.members.length
     const next = {
       id: `m${Date.now()}`,
@@ -1192,17 +1347,22 @@ export default function Dashboard({
       skin: SKIN[index % SKIN.length],
       hair: HAIR[index % HAIR.length],
       hairColor: '#1a1410',
+      password: 'magang2026',
     }
-    api.addMember(next)
+    const res = await api.addMember(next)
+    if (!res.success) {
+      setMsg(`Gagal menambahkan anggota ke Supabase: ${res.error}`, 'error', 6000)
+      return false
+    }
     onMemberChange(next.id)
     setTab('profile')
-    setMsg('Contestant baru ditambahkan ke panggung arena!')
-    setTimeout(() => setMsg(''), 4000)
+    setMsg('Contestant baru ditambahkan ke Supabase dan panggung arena!')
+    return true
   }
 
-  const removeMember = () => {
+  const removeMember = async () => {
     if (data.members.length <= 1) {
-      setMsg('Minimal satu contestant harus tersisa.')
+      setMsg('Minimal satu contestant harus tersisa.', 'error')
       return
     }
     if (arm !== `m:${effectiveMemberId}`) {
@@ -1210,41 +1370,52 @@ export default function Dashboard({
       return
     }
     const fallback = data.members.find((m) => m.id !== effectiveMemberId)
-    api.removeMember(effectiveMemberId)
+    const res = await api.removeMember(effectiveMemberId)
+    if (!res.success) {
+      setMsg(`Gagal menghapus contestant di Supabase: ${res.error}`, 'error', 6000)
+      return
+    }
     onMemberChange(fallback?.id ?? null)
     setEditJ(null)
     setEditP(null)
     setArm(null)
-    setMsg('Contestant dihapus.')
+    setMsg('Contestant berhasil dihapus dari Supabase.')
   }
 
-  const removeJournal = (id) => {
+  const removeJournal = async (id) => {
     if (arm !== id) {
       setArm(id)
       return
     }
-    api.deleteJournal(id)
+    const res = await api.deleteJournal(id)
     setArm(null)
+    if (!res.success) {
+      setMsg(`Gagal menghapus kegiatan di Supabase: ${res.error}`, 'error', 6000)
+      return
+    }
     if (editJ === id) setEditJ(null)
-    setMsg('Kegiatan magang berhasil dihapus.')
-    setTimeout(() => setMsg(''), 4000)
+    setMsg('Kegiatan magang berhasil dihapus dari Supabase.')
   }
 
-  const removeProject = (id) => {
+  const removeProject = async (id) => {
     if (arm !== id) {
       setArm(id)
       return
     }
-    api.deleteProject(id)
+    const res = await api.deleteProject(id)
     setArm(null)
+    if (!res.success) {
+      setMsg(`Gagal menghapus project di Supabase: ${res.error}`, 'error', 6000)
+      return
+    }
     if (editP === id) setEditP(null)
-    setMsg('Project berhasil dihapus.')
-    setTimeout(() => setMsg(''), 4000)
+    setMsg('Project berhasil dihapus dari Supabase.')
   }
 
-  const importJson = (raw) => {
+  const importJson = async (raw) => {
+    let parsed
     try {
-      const parsed = JSON.parse(raw)
+      parsed = JSON.parse(raw)
       if (
         !parsed ||
         !Array.isArray(parsed.members) ||
@@ -1254,43 +1425,48 @@ export default function Dashboard({
       ) {
         throw new Error('invalid')
       }
-      api.importData(parsed)
-      onMemberChange(parsed.members[0].id)
-      setEditJ(null)
-      setEditP(null)
-      setArm(null)
-      setMsg(
-        `Impor berhasil: ${parsed.members.length} contestant, ${parsed.journals.length} jurnal, ${parsed.projects.length} project.`,
-      )
     } catch {
-      setMsg('Impor gagal. Pastikan format JSON memuat members, journals, dan projects.')
+      setMsg('Impor gagal. Pastikan format JSON memuat members, journals, dan projects.', 'error', 6000)
+      return
     }
+
+    setMsg('Mengimpor data ke Supabase...', 'info', 0)
+    const res = await api.importData(parsed)
+    if (!res.success) {
+      setMsg(`Gagal mengimpor data ke Supabase: ${res.error}`, 'error', 6000)
+      return
+    }
+    onMemberChange(parsed.members[0].id)
+    setEditJ(null)
+    setEditP(null)
+    setArm(null)
+    setMsg(
+      `Impor ke Supabase berhasil: ${parsed.members.length} contestant, ${parsed.journals.length} jurnal, ${parsed.projects.length} project.`,
+    )
   }
 
   const clearData = async () => {
-    setMsg('Mengosongkan semua jurnal dan project...')
+    setMsg('Mengosongkan semua jurnal dan project di Supabase...', 'info', 0)
     const res = await api.clearData()
     setEditJ(null)
     setEditP(null)
     setArm(null)
     setJump(null)
-    setMsg(
-      res.success
-        ? 'Semua jurnal dan project berhasil dikosongkan. Akun anggota tetap tersimpan.'
-        : `Gagal mengosongkan data: ${res.error}`,
-    )
-    setTimeout(() => setMsg(''), 5000)
+    if (res.success) {
+      setMsg('Semua jurnal dan project berhasil dikosongkan di Supabase. Akun anggota tetap tersimpan.')
+    } else {
+      setMsg(`Gagal mengosongkan data di Supabase: ${res.error}`, 'error', 6000)
+    }
   }
 
-  const handleSyncSupabase = async () => {
-    setMsg('Sedang menyinkronkan data ke Supabase...')
-    const res = await api.syncLocalToSupabase()
+  const handleRefreshSupabase = async () => {
+    setMsg('Memuat ulang data terbaru dari Supabase...', 'info', 0)
+    const res = await api.refresh()
     if (res.success) {
-      setMsg('Seluruh data berhasil disinkronkan ke Supabase!')
+      setMsg('Data berhasil dimuat ulang dari Supabase!')
     } else {
-      setMsg(`Gagal sinkronisasi: ${res.error}`)
+      setMsg(`Gagal memuat ulang: ${res.error}`, 'error', 6000)
     }
-    setTimeout(() => setMsg(''), 5000)
   }
 
   const tabs = useMemo(() => {
@@ -1316,8 +1492,8 @@ export default function Dashboard({
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-line pb-4">
           <div className="flex flex-wrap items-center gap-3">
             <div className="wide flex items-center gap-2 text-[19px]">
-              <span className="grid h-[32px] w-[32px] shrink-0 place-items-center bg-brand">
-                <Tri size={16} />
+              <span className="grid h-[32px] w-[32px] shrink-0 place-items-center bg-brand [clip-path:polygon(0_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%)]">
+                <Tri size={22} />
               </span>
               <span>DASHBOARD MAGANG</span>
             </div>
@@ -1337,24 +1513,20 @@ export default function Dashboard({
             <div className="inline-flex items-center gap-1.5 border border-line bg-panel px-2.5 py-1 font-mono text-[11px]">
               <span
                 className={`h-2 w-2 rounded-full ${
-                  isSupabaseConfigured
-                    ? syncStatus === 'connected'
+                  isSyncing || syncStatus === 'syncing' || syncStatus === 'loading'
+                    ? 'animate-pulse bg-brand'
+                    : syncStatus === 'connected'
                       ? 'bg-emerald-400'
-                      : syncStatus === 'syncing'
-                      ? 'bg-brand animate-pulse'
                       : 'bg-alert'
-                    : 'bg-zinc-500'
                 }`}
                 aria-hidden="true"
               />
               <span className="text-zinc-300">
-                {isSupabaseConfigured
-                  ? syncStatus === 'connected'
-                    ? 'Cloud: Supabase (Realtime)'
-                    : syncStatus === 'syncing'
-                    ? 'Supabase: Menyinkronkan...'
-                    : 'Supabase: Offline'
-                  : 'Storage: Mode Lokal'}
+                {isSyncing || syncStatus === 'syncing' || syncStatus === 'loading'
+                  ? 'Supabase: Menyinkronkan...'
+                  : syncStatus === 'connected'
+                    ? 'Supabase: Terhubung (Realtime)'
+                    : 'Supabase: Gangguan Koneksi'}
               </span>
             </div>
           </div>
@@ -1398,7 +1570,7 @@ export default function Dashboard({
                 <span style={{ color: member.aura }}>{member.name}</span>
               </h1>
               <p className="mt-1 font-mono text-sm text-zinc-300">
-                {member.role} — Tambah &amp; ganti isi jurnal dan featured project magang
+                {member.role} · Tambah &amp; ganti isi jurnal dan featured project magang
               </p>
             </div>
 
@@ -1437,12 +1609,34 @@ export default function Dashboard({
         </div>
 
         {/* Feedback / Alert Message */}
-        {msg ? (
+        {feedback ? (
           <div
-            className="mb-4 border border-brand/40 bg-brand/10 px-4 py-2.5 font-mono text-xs text-brand"
-            role="status"
+            className={`mb-4 border px-4 py-2.5 font-mono text-xs ${
+              feedback.type === 'error'
+                ? 'border-alert/50 bg-alert/10 text-red-200'
+                : 'border-brand/40 bg-brand/10 text-brand'
+            }`}
+            role={feedback.type === 'error' ? 'alert' : 'status'}
           >
-            ✓ {msg}
+            {feedback.type === 'error' ? '✕ ' : feedback.type === 'info' ? '… ' : '✓ '}
+            {feedback.text}
+          </div>
+        ) : null}
+
+        {syncError && feedback?.type !== 'error' ? (
+          <div
+            className="mb-4 flex flex-wrap items-center justify-between gap-3 border border-alert/40 bg-alert/10 px-4 py-2.5 font-mono text-xs text-red-200"
+            role="alert"
+          >
+            <span>Supabase: {syncError}</span>
+            <button
+              type="button"
+              className="btn btn-g px-3 py-1 text-xs"
+              disabled={isSyncing}
+              onClick={handleRefreshSupabase}
+            >
+              Muat Ulang
+            </button>
           </div>
         ) : null}
 
@@ -1758,12 +1952,14 @@ export default function Dashboard({
             setMsg={setMsg}
             isSupabaseConfigured={isSupabaseConfigured}
             syncStatus={syncStatus}
-            onSyncSupabase={handleSyncSupabase}
+            syncError={syncError}
+            isSyncing={isSyncing}
+            onRefreshSupabase={handleRefreshSupabase}
           />
         ) : null}
 
         <div className="mt-8 border-t border-line pt-4 font-mono text-[11px] text-muted">
-          THE FINALS // PKL SQUAD · {pad(data.members.length)} Contestant ·{' '}
+          PERKUMPULAN MANUSIA PINTER · {pad(data.members.length)} Contestant ·{' '}
           {data.journals.length} Jurnal Tercatat · {data.projects.length} Project Output
         </div>
       </div>

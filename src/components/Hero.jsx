@@ -8,7 +8,7 @@ export default function Hero({ data, active, onGo, session, onOpenLogin, onOpenD
     [data.members.length, 'Total anggota'],
     [data.journals.length, 'Jurnal tercatat'],
     [data.projects.length, 'Featured project'],
-    ['3 BLN', 'Periode PKL'],
+    ['2 BLN', 'Periode PKL'],
   ]
 
   const fade = (delay = 0) =>

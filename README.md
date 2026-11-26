@@ -1,4 +1,4 @@
-# PKL Squad Arena
+# Perkumpulan Manusia Pinter
 
 Landing page bertema arena/competition show untuk laporan Praktik Kerja Lapangan
 lima anggota. Versi React dari `legacy/index.html` (file HTML statis lama tetap
@@ -10,7 +10,7 @@ disimpan apa adanya sebagai referensi).
 - **Tailwind CSS 4** (via `@tailwindcss/vite`, tema di `src/index.css`)
 - **Motion** (Framer Motion) untuk animasi masuk, carousel karakter, dan accordion
 - **React Router 7** untuk URL per anggota, login page, dan dashboard
-- **Database**: **Supabase (PostgreSQL + Realtime)** dengan fallback otomatis ke `localStorage` offline cache
+- **Database**: **Supabase (PostgreSQL + Realtime)** sebagai penyimpanan utama untuk anggota, jurnal, dan project
 
 ## Menjalankan
 
@@ -35,14 +35,13 @@ Aplikasi ini sudah siap terhubung ke **Supabase** agar seluruh perubahan kegiata
    ```bash
    cp .env.example .env.local
    ```
-5. Isi konfigurasi Supabase di `.env.local` (didapat dari Supabase &rarr; **Project Settings** &rarr; **API**):
+5. Isi konfigurasi Supabase di `.env` atau `.env.local` (didapat dari Supabase &rarr; **Project Settings** &rarr; **API Keys**):
    ```env
    VITE_SUPABASE_URL=https://xxxxxxxxxxxx.supabase.co
-   VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+   VITE_SUPABASE_ANON_KEY=sb_publishable_xxxxxxxxxxxx
    ```
-6. Jalankan `npm run dev`. Aplikasi akan otomatis terhubung ke Supabase dengan status `Cloud: Supabase (Realtime)`!
-
-> *Catatan: Jika Supabase belum dikonfigurasi, aplikasi tetap otomatis berjalan normal menggunakan penyimpanan lokal (`localStorage`).*
+   > **Penting:** Gunakan **Publishable Key** (`sb_publishable_...`) atau Legacy **Anon Key** (`eyJ...`). Jangan memakai **Secret Key** (`sb_secret_...`) karena Supabase memblokir penggunaan secret key dari browser (`401 Forbidden`).
+6. Jalankan `npm run dev`. Aplikasi akan langsung memuat dan menyimpan seluruh data ke Supabase dengan status `Supabase: Terhubung (Realtime)`.
 
 ## Routing & Akses
 
@@ -108,7 +107,7 @@ src/
   lib/
     supabase.js         koneksi Supabase client, realtime, dan data mappers
     auth.js             autentikasi anggota magang & admin, session management
-    useData.js          load/save Supabase + optimistic localStorage cache
+    useData.js          load/save dan realtime subscription Supabase
     pkl.js              periode magang (1 Okt–30 Nov), tanggal kosong, tanggal berikutnya
     utils.js            format tanggal, warna status, judul otomatis, helper
   components/

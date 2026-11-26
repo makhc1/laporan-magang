@@ -37,10 +37,10 @@ export default function LoginPage({ members = [], onSuccess, onCancel }) {
         {/* Top Header */}
         <div className="flex items-center justify-between gap-4">
           <div className="wide flex items-center gap-2.5 text-[19px]">
-            <span className="grid h-[34px] w-[34px] shrink-0 place-items-center bg-brand">
-              <Tri />
+            <span className="grid h-[34px] w-[34px] shrink-0 place-items-center bg-brand [clip-path:polygon(0_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%)]">
+              <Tri size={24} />
             </span>
-            <span className="hidden min-[560px]:inline">THE FINALS // PKL SQUAD</span>
+            <span className="hidden min-[560px]:inline">PERKUMPULAN MANUSIA PINTER</span>
           </div>
           <button className="btn btn-g" type="button" onClick={onCancel}>
             ← Kembali ke arena
@@ -52,7 +52,7 @@ export default function LoginPage({ members = [], onSuccess, onCancel }) {
           {/* Left Column: Info & Quick Demo Select */}
           <div className="lg:col-span-7">
             <div className="mb-5 inline-flex items-center gap-2.5 border border-brand/40 bg-brand/10 px-3 py-1.5 font-mono text-xs uppercase tracking-[0.04em] text-brand">
-              <Tri size={14} />
+              <Tri size={18} variant="onDark" />
               Portal Kegiatan // Anggota Magang &amp; Admin
             </div>
             <h1 className="disp text-[clamp(44px,7vw,88px)]">
@@ -102,7 +102,7 @@ export default function LoginPage({ members = [], onSuccess, onCancel }) {
                 Pass admin // <strong className="text-zinc-200">pkl2026</strong>
               </span>
               <span className="border border-line bg-panel px-2.5 py-1.5">
-                Data // localStorage
+                Data // <strong className="text-zinc-200">Supabase</strong>
               </span>
             </div>
           </div>

@@ -1,3 +1,4 @@
+import { motion, useReducedMotion, useScroll, useSpring } from 'motion/react'
 import Tri from './Tri'
 
 export default function Nav({
@@ -10,6 +11,14 @@ export default function Nav({
   onOpenDashboard,
   onLogout,
 }) {
+  const reduce = useReducedMotion()
+  const { scrollYProgress } = useScroll()
+  const smoothProgress = useSpring(scrollYProgress, {
+    stiffness: 180,
+    damping: 28,
+    restDelta: 0.001,
+  })
+
   const menu = [
     ['#home', '01 // Home Briefing'],
     ['#stage', '02 // Pilih Karakter'],
@@ -18,12 +27,18 @@ export default function Nav({
 
   return (
     <header className="sticky top-0 z-[80] h-16 border-b border-line bg-canvas/90 backdrop-blur-md">
+      {/* Garis progres gulir halus 2px di tepi bawah navbar */}
+      <motion.span
+        className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] origin-left bg-brand"
+        style={{ scaleX: reduce ? scrollYProgress : smoothProgress }}
+        aria-hidden="true"
+      />
       <div className="mx-auto flex h-full w-full max-w-[1280px] items-center justify-between gap-4 px-5">
-        <div className="wide flex items-center gap-2.5 whitespace-nowrap text-[19px]">
-          <span className="grid h-[34px] w-[34px] shrink-0 place-items-center bg-brand">
-            <Tri />
+        <div className="wide flex items-center gap-2.5 whitespace-nowrap text-[16px] xl:text-[19px]">
+          <span className="grid h-[34px] w-[34px] shrink-0 place-items-center bg-brand [clip-path:polygon(0_0,100%_0,100%_calc(100%-6px),calc(100%-6px)_100%,0_100%)]">
+            <Tri size={24} />
           </span>
-          <span className="hidden min-[560px]:inline">THE FINALS // PKL SQUAD</span>
+          <span className="hidden min-[560px]:inline">PERKUMPULAN MANUSIA PINTER</span>
         </div>
 
         <nav className="hidden gap-1 min-[900px]:flex" aria-label="Navigasi utama">

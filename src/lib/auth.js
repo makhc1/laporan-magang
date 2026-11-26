@@ -1,7 +1,7 @@
 const AUTH_KEY = 'finals-pkl-admin'
 const SESSION_KEY = 'finals-pkl-session'
 
-// Ganti lewat .env.local kalau perlu:
+// Ganti lewat .env.local atau .env kalau perlu:
 // VITE_ADMIN_USER=admin
 // VITE_ADMIN_PASS=pkl2026
 const env = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env : {}
@@ -10,7 +10,7 @@ const ADMIN_PASS = env.VITE_ADMIN_PASS || 'pkl2026'
 
 export function getAuthSession() {
   try {
-    const raw = localStorage.getItem(SESSION_KEY)
+    const raw = sessionStorage.getItem(SESSION_KEY)
     if (raw) {
       const parsed = JSON.parse(raw)
       if (parsed && (parsed.role === 'admin' || parsed.role === 'member')) {
@@ -18,7 +18,7 @@ export function getAuthSession() {
       }
     }
     // Cek backwards compatibility admin
-    if (localStorage.getItem(AUTH_KEY) === '1') {
+    if (sessionStorage.getItem(AUTH_KEY) === '1') {
       return {
         role: 'admin',
         memberId: null,
@@ -34,11 +34,11 @@ export function getAuthSession() {
 
 export function saveSession(session) {
   try {
-    localStorage.setItem(SESSION_KEY, JSON.stringify(session))
+    sessionStorage.setItem(SESSION_KEY, JSON.stringify(session))
     if (session.role === 'admin') {
-      localStorage.setItem(AUTH_KEY, '1')
+      sessionStorage.setItem(AUTH_KEY, '1')
     } else {
-      localStorage.removeItem(AUTH_KEY)
+      sessionStorage.removeItem(AUTH_KEY)
     }
   } catch {
     /* private mode */
@@ -47,8 +47,8 @@ export function saveSession(session) {
 
 export function clearSession() {
   try {
-    localStorage.removeItem(SESSION_KEY)
-    localStorage.removeItem(AUTH_KEY)
+    sessionStorage.removeItem(SESSION_KEY)
+    sessionStorage.removeItem(AUTH_KEY)
   } catch {
     /* private mode */
   }
@@ -58,7 +58,7 @@ export function clearSession() {
  * Autentikasi untuk anggota magang atau admin
  * @param {string} username - Username / id / nama anggota atau 'admin'
  * @param {string} password - Password
- * @param {Array} members - Daftar anggota dari state/storage
+ * @param {Array} members - Daftar anggota dari Supabase
  * @returns {{ success: boolean, session?: object, error?: string }}
  */
 export function login(username, password, members = []) {
@@ -93,17 +93,14 @@ export function login(username, password, members = []) {
   )
 
   if (member) {
-    // Password yang valid:
-    // a) Password kustom di profil anggota (jika ada)
-    // b) Default password: 'magang2026'
-    // c) Default fallback: 'pkl2026'
-    // d) Password sama dengan ID anggota (misal: 'ahmad')
     const customPass = member.password ? String(member.password).trim() : null
+    const isDefaultPass = !customPass || customPass === 'magang2026'
     const valid =
       (customPass && p === customPass) ||
-      p === 'magang2026' ||
-      p === 'pkl2026' ||
-      p.toLowerCase() === member.id.toLowerCase()
+      (isDefaultPass &&
+        (p === 'magang2026' ||
+          p === 'pkl2026' ||
+          p.toLowerCase() === member.id.toLowerCase()))
 
     if (valid) {
       const session = {
@@ -117,7 +114,9 @@ export function login(username, password, members = []) {
     }
     return {
       success: false,
-      error: `Password salah untuk ${member.name}. Password default: magang2026`,
+      error: isDefaultPass
+        ? `Password salah untuk ${member.name}. Password default: magang2026`
+        : `Password salah untuk ${member.name}.`,
     }
   }
 
